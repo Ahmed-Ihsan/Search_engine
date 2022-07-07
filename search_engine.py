@@ -1,3 +1,4 @@
+from concurrent.futures import thread
 import sqlite3
 import time
 from threading import Thread
@@ -7,8 +8,7 @@ class search_engine():
     def __init__(self,db_file_name):
         self.db_file_name = db_file_name
         self.list_TC = dict()
-        self.reslt = set()
-        self.resl_select = list()
+        self.resl = set()
         con = sqlite3.connect(db_file_name)
         cursor = con.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -93,7 +93,8 @@ class search_engine():
                 con2.execute(f"INSERT INTO VOLUE (ID,COL,NAME) \
                                     VALUES (?,?,?)",(cont, i[1] , i[0]));
             con2.commit()
-        except:
+        except Exception as e:
+            # print(e)
             pass
         
         con2.close()
@@ -105,17 +106,19 @@ class search_engine():
         con = sqlite3.connect('search_engine.db')
         cur = con.cursor()
         list_resl = []
+        resl_select = list()
         for i in list_data:
             if list_data != 'None':
                 list_resl.append(cur.execute(f"SELECT * from VOLUE WHERE COL='{i}'"))
-                self.resl_select.append([j for i in list_resl for j in i])
+                resl_select.append([j for i in list_resl for j in i])
             else:
                 list_resl.append(cur.execute(f"SELECT * from VOLUE"))
-                self.resl_select.append([j for i in list_resl for j in i])
+                resl_select.append([j for i in list_resl for j in i])
                 break
-        return self.resl_select
+        return resl_select
     
-    def search(self,key_words ,*list_data):
+    def search(self,key_words , *list_data):
+        self.resl = set()
         if len(list_data) == 0:
             list_data = self.view_val()
         else:
@@ -124,8 +127,7 @@ class search_engine():
             key_words = key_words.split()
             dict_thread = dict()
             for cont , word in enumerate(key_words):
-                dict_thread[f'{cont}'] = Thread(target=save_reslt,args=(list_data,word,self.reslt))
-        
+                dict_thread[f'{cont}'] = Thread(target=save_reslt,args=(list_data,word,self.resl))
             for i in dict_thread:
                 dict_thread[i].start()
             for i in dict_thread:
@@ -133,15 +135,12 @@ class search_engine():
                     dict_thread[i].join()
                 except:
                     pass
-        resl = self.reslt.copy()
-        self.resl_select = []
-        self.reslt = set()
-        return resl
+        return self.resl
 
-def save_reslt(list_data,word,reslt = set()):
+def save_reslt(list_data,word,reslt):
     for j in list_data:
         for i in j:
-            if word in i[2]:
+            if i[2] == word:
                 reslt.add((i[2],i[1]))
                 
 
@@ -165,14 +164,33 @@ def test(text):
     start = time.time()
     resl = sengine.search(text)
     end = time.time() - start
-    column = set()
-    for i in resl:
-        column.add(i[1])
+    word = list()
+    col = list()
+    for i in resl.union():
         print(f'found {i[0]} in : {i[1]}')
-    for i in column:
-        print(f'you can search in : {i}')
+        if not i[0] in word:
+            word.append(i[0])
+            col.append(i[1])
+    for i in range(len(word)):
+        print(f'you can search in for <{word[i]}> in <{col[i]}>')
+    print(f'found reslt : {len(resl)}')
     print(end)
 
 
 test('test ahmed 12 ali admin test')
 test('ahmed')
+test('123')
+test('1 2 3 4 5 6 7 8 98 10 11 23  56 8563 ahmed test')
+
+thread_start = dict()
+for i in range(200):
+    thread_start[f'{i}'] = Thread(target=test,args=(['ahmed']))
+
+for i in thread_start:
+    thread_start[i].start()
+
+# for i in thread_start:
+#     try:
+#         thread_start[i].join()
+#     except:
+        # pass
